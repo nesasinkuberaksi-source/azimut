@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title> Navigasi Pramuka by Ganteng Kalem Eka Amin Hidayat </title>
+
+<style>
+:root{--neon:#00ffd0}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  height:100vh;
+  font-family:'Segoe UI',sans-serif;
+  background:radial-gradient(circle at top,#003b30,#000f0b);
+  color:#eafff9;
+  overflow:hidden;
+}
+.full{
+  position:fixed;top:10px;right:10px;
+  padding:10px 14px;border-radius:12px;
+  background:var(--neon);font-weight:bold;z-index:10;
+}
+header{text-align:center;padding:10px}
+header h1{margin:0;color:var(--neon);text-shadow:0 0 15px var(--neon)}
+.wrap{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:10px;height:calc(100vh - 90px);padding:10px
+}
+@media(max-width:800px){.wrap{grid-template-columns:1fr}}
+.card{
+  background:rgba(255,255,255,0.05);
+  backdrop-filter:blur(10px);
+  border-radius:20px;padding:15px;
+  box-shadow:0 0 35px rgba(0,255,200,.25)
+}
+.control{display:flex;gap:8px;flex-wrap:wrap}
+input{padding:8px;width:120px;border-radius:10px;border:none}
+button{
+  padding:8px 14px;border:none;border-radius:10px;
+  background:linear-gradient(135deg,#00ffd0,#00a58c);
+  font-weight:bold
+}
+.result{margin-top:6px;color:#ffeaa0;font-size:14px}
+
+/* COMPASS */
+.scene{display:flex;justify-content:center;perspective:900px}
+.compass{
+  width:260px;height:260px;border-radius:50%;
+  background:radial-gradient(circle,#015645,#001610);
+  border:4px solid var(--neon);
+  box-shadow:0 0 25px var(--neon);
+  position:relative;transform-style:preserve-3d;
+}
+.compass::before{
+  content:"";position:absolute;inset:20px;
+  border-radius:50%;
+  border:2px dashed rgba(0,255,200,.4);
+  animation:spin 20s linear infinite
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.needle,.backneedle{
+  position:absolute;width:6px;height:110px;
+  top:20px;left:50%;transform-origin:bottom;border-radius:4px
+}
+.needle{background:linear-gradient(to top,#ff4444,#ffaaaa);box-shadow:0 0 15px red}
+.backneedle{background:rgba(255,255,255,.5)}
+.center{
+  width:14px;height:14px;background:#fff;border-radius:50%;
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)
+}
+.dir{position:absolute;font-weight:bold}
+/* Huruf arah mata angin tetap di pinggir */
+.N{top:4px;left:50%;transform:translateX(-50%)}
+.E{right:4px;top:50%;transform:translateY(-50%)}
+.S{bottom:4px;left:50%;transform:translateX(-50%)}
+.W{left:4px;top:50%;transform:translateY(-50%)}
+
+/* DEGREE NUMBERS - JELAS, GLOW, DI LUAR */
+.degree{
+  position:absolute;
+  font-size:14px;
+  font-weight:800;
+  color:#ffd800; /* kuning terang */
+  text-shadow:
+    0 0 4px #000,
+    0 0 8px rgba(255,216,0,.9),
+    0 0 14px rgba(255,216,0,.6);
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+}
+.degree.big{
+  font-size:18px;
+  color:#ffeb3b;
+}
+
+/* MAP */
+canvas{
+  width:100%;height:100%;
+  background:#021c16;border-radius:16px
+}
+
+/* MISSION */
+.mission{
+  margin-top:8px;
+  padding:8px;
+  background:rgba(0,255,200,.12);
+  border-radius:10px;
+  font-weight:bold;
+  text-align:center
+}
+</style>
+</head>
+
+<body>
+
+<button class="full" onclick="document.documentElement.requestFullscreen()">⛶ FULL</button>
+
+<header>
+  <h1> NAVIGASI PRAMUKA BY GANTENG KALEM EKA AMIN HIDAYAT </h1>
+  <p>Azimut • Back Azimut • Peta</p>
+</header>
+
+<div class="wrap">
+
+<!-- KOMPAS -->
+<div class="card">
+  <div class="control">
+    <input type="number" id="azInput" placeholder="Azimut °">
+    <button onclick="setAz()">SET</button>
+    <button onclick="newMission()">MIS I BARU</button>
+  </div>
+  <div class="mission" id="mission">Tekan MISI BARU</div>
+  <div class="result" id="info"></div>
+
+  <div class="scene">
+    <div class="compass" id="compass">
+      <div class="backneedle" id="backneedle"></div>
+      <div class="needle" id="needle"></div>
+      <div class="center"></div>
+      <div class="dir N">U</div>
+      <div class="dir E">T</div>
+      <div class="dir S">S</div>
+      <div class="dir W">B</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAP -->
+<div class="card">
+  <canvas id="map"></canvas>
+  <!-- Musik -->
+<div style="position:fixed;top:10px;left:10px;z-index:9999;">
+  <audio controls autoplay loop>
+    <source src="MUSIK.mp3" type="audio/mpeg">
+    Browser Anda tidak mendukung audio.
+  </audio>
+</div>
+</div>
+
+</div>
+
+<script>
+let az=0,target=null;
+const needle=document.getElementById("needle");
+const backneedle=document.getElementById("backneedle");
+const info=document.getElementById("info");
+const missionBox=document.getElementById("mission");
+
+/* DEGREE LABELS - DI LUAR PINGGIR KOMPAS */
+const compass=document.getElementById("compass");
+const center=130;
+const radius=140; // radius diperbesar supaya angka di pinggir dan tidak menutupi huruf
+
+for(let d=0; d<360; d+=30){
+  const span=document.createElement("div");
+  span.className="degree";
+  span.innerText=d;
+
+  if(d % 90 === 0) span.classList.add("big"); // 0,90,180,270 lebih besar
+
+  const rad=d*Math.PI/180;
+  const x=center + radius*Math.sin(rad);
+  const y=center - radius*Math.cos(rad);
+
+  span.style.left=x+"px";
+  span.style.top=y+"px";
+
+  compass.appendChild(span);
+}
+
+function setAz(){
+  az=Number(document.getElementById("azInput").value);
+  if(isNaN(az)||az<0||az>360)return;
+  update();
+}
+
+function update(){
+  let back=az<180?az+180:az-180;
+  info.innerHTML=`Azimut ${az.toFixed(0)}° | Back ${back.toFixed(0)}°`;
+  needle.style.transform=`translateX(-50%) rotate(${az}deg)`;
+  backneedle.style.transform=`translateX(-50%) rotate(${back}deg)`;
+  drawMap(az,back);
+  checkMission();
+}
+
+/* MISSION */
+function newMission(){
+  target=Math.floor(Math.random()*12)*30;
+  missionBox.innerHTML=`🎯 MISI: Arahkan ke <b>${target}°</b>`;
+}
+function checkMission(){
+  if(target===null)return;
+  let diff=Math.abs(az-target);
+  if(diff>180)diff=360-diff;
+  if(diff<5){
+    missionBox.innerHTML=`✅ BERHASIL! Tepat di ${target}°`;
+  }
+}
+
+/* MAP */
+const c=document.getElementById("map");
+const ctx=c.getContext("2d");
+function resize(){
+  c.width=c.offsetWidth;c.height=c.offsetHeight
+}
+window.onresize=resize;resize();
+
+function drawMap(a,b){
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.strokeStyle="rgba(255,255,255,.1)";
+  for(let i=0;i<c.width;i+=40){
+    ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,c.height);ctx.stroke()
+  }
+  for(let j=0;j<c.height;j+=40){
+    ctx.beginPath();ctx.moveTo(0,j);ctx.lineTo(c.width,j);ctx.stroke()
+  }
+  let cx=c.width/2,cy=c.height/2,len=150;
+  ctx.strokeStyle="#00ffd0";ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(cx,cy);
+  ctx.lineTo(cx+len*Math.sin(a*Math.PI/180),cy-len*Math.cos(a*Math.PI/180));
+  ctx.stroke();
+  ctx.setLineDash([8,6]);
+  ctx.strokeStyle="rgba(255,255,255,.8)";
+  ctx.beginPath();ctx.moveTo(cx,cy);
+  ctx.lineTo(cx+len*Math.sin(b*Math.PI/180),cy-len*Math.cos(b*Math.PI/180));
+  ctx.stroke();ctx.setLineDash([]);
+}
+
+/* GESTURE */
+let lastX=null;
+document.addEventListener("touchstart",e=>lastX=e.touches[0].clientX);
+document.addEventListener("touchmove",e=>{
+  if(lastX!==null){
+    az=(az+(e.touches[0].clientX-lastX)*0.3)%360;
+    if(az<0)az+=360;
+    update();lastX=e.touches[0].clientX;
+  }
+});
+document.addEventListener("mousedown",e=>lastX=e.clientX);
+document.addEventListener("mousemove",e=>{
+  if(lastX!==null&&e.buttons){
+    az=(az+(e.clientX-lastX)*0.3)%360;
+    update();lastX=e.clientX;
+  }
+});
+document.addEventListener("mouseup",()=>lastX=null);
+
+</script>
+
+</body>
+</html>
